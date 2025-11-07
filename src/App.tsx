@@ -8,8 +8,8 @@ import { QRScanScreen } from "./components/QRScanScreen";
 import { BeanSelectionScreen } from "./components/BeanSelectionScreen";
 import { BrewOrderScreen } from "./components/BrewOrderScreen";
 import { OrderHistory } from "./components/OrderHistory";
-import { Button } from "./components/ui/button";
-import { QrCode, History } from "lucide-react";
+import { UserProfile } from "./components/UserProfile";
+import { BottomNav } from "./components/BottomNav";
 import { toast } from "sonner@2.0.3";
 import { Toaster } from "./components/ui/sonner";
 
@@ -373,8 +373,9 @@ export default function App() {
     Set<string>
   >(new Set());
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [viewingOrderHistory, setViewingOrderHistory] =
-    useState(false);
+  
+  // Bottom navigation state
+  const [activeTab, setActiveTab] = useState<"map" | "scan" | "history" | "profile">("map");
 
   // QR Code flow states
   const [qrFlowActive, setQrFlowActive] = useState(false);
@@ -459,6 +460,17 @@ export default function App() {
     });
   };
 
+  // Bottom nav handler
+  const handleTabChange = (tab: "map" | "scan" | "history" | "profile") => {
+    if (tab === "scan") {
+      // Start QR flow
+      setQrFlowActive(true);
+      setQrFlowStep("scan");
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
   // QR Flow handlers
   const handleStartQRFlow = () => {
     setQrFlowActive(true);
@@ -515,11 +527,12 @@ export default function App() {
       description: `${brewMethod} brewing method recorded${rating ? ` with ${rating} stars` : ""}`,
     });
 
-    // Reset QR flow
+    // Reset QR flow and return to map
     setQrFlowActive(false);
     setQrFlowStep("scan");
     setQrScannedCafeId(undefined);
     setQrSelectedBeanId(undefined);
+    setActiveTab("map");
   };
 
   // QR Flow screens
@@ -585,23 +598,7 @@ export default function App() {
     }
   }
 
-  // If viewing order history, show the order history screen
-  if (viewingOrderHistory) {
-    return (
-      <OrderHistory
-        orders={orderHistory}
-        onBack={() => setViewingOrderHistory(false)}
-        onBeanClick={(beanId) => {
-          setViewingOrderHistory(false);
-          setViewingBeanDetail(beanId);
-        }}
-        onCafeClick={(cafeId) => {
-          setViewingOrderHistory(false);
-          setViewingCafeDetail(cafeId);
-        }}
-      />
-    );
-  }
+
 
   // If viewing a bean detail, show the bean detail screen
   if (
@@ -670,59 +667,91 @@ export default function App() {
     }
   }
 
-  return (
-    <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden max-w-md mx-auto">
-      {/* Map Section */}
-      <div className="flex-1 relative">
-        <MapView
-          cafes={mockCafes}
-          selectedCafe={selectedCafe}
-          onCafeSelect={setSelectedCafe}
-        />
-
-        {/* Floating Action Buttons */}
-        <div className="absolute bottom-6 right-6 flex flex-col gap-3">
-          <Button
-            onClick={() => setViewingOrderHistory(true)}
-            className="h-14 px-6 bg-white hover:bg-slate-50 text-slate-900 shadow-lg border border-slate-200"
-            size="lg"
-          >
-            <History className="w-5 h-5 mr-2" />
-            History
-          </Button>
-          <Button
-            onClick={handleStartQRFlow}
-            className="h-14 px-6 bg-amber-600 hover:bg-amber-700 shadow-lg"
-            size="lg"
-          >
-            <QrCode className="w-5 h-5 mr-2" />
-            Scan QR
-          </Button>
+  // Main screen content based on active tab
+  const renderMainContent = () => {
+    if (activeTab === "history") {
+      return (
+        <div className="h-screen w-full bg-white flex flex-col max-w-md mx-auto">
+          <div className="flex-1 min-h-0">
+            <OrderHistory
+              orders={orderHistory}
+              onBeanClick={(beanId) => {
+                setViewingBeanDetail(beanId);
+              }}
+              onCafeClick={(cafeId) => {
+                setViewingCafeDetail(cafeId);
+              }}
+            />
+          </div>
+          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
-      </div>
+      );
+    }
 
-      {/* Pull-up Panel */}
-      <div className="h-[55vh] flex-shrink-0">
-        <CafeListPanel
-          cafes={mockCafes}
-          selectedCafe={selectedCafe}
-          onCafeSelect={handleCafeSelect}
-          onFilterClick={() => setFilterSheetOpen(true)}
-          activeFilterCount={activeFilterCount}
+    if (activeTab === "profile") {
+      return (
+        <div className="h-screen w-full bg-white flex flex-col max-w-md mx-auto">
+          <div className="flex-1 min-h-0">
+            <UserProfile
+              userName="Alex Johnson"
+              favoriteCafes={favoriteCafes}
+              favoriteBeans={favoriteBeans}
+              orders={orderHistory}
+              allCafes={mockCafes}
+              allBeans={beanDetails}
+              onBeanClick={(beanId) => {
+                setViewingBeanDetail(beanId);
+              }}
+              onCafeClick={(cafeId) => {
+                setViewingCafeDetail(cafeId);
+              }}
+            />
+          </div>
+          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+        </div>
+      );
+    }
+
+    // Default: Map view
+    return (
+      <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden max-w-md mx-auto">
+        {/* Map Section */}
+        <div className="flex-1 relative min-h-0">
+          <MapView
+            cafes={mockCafes}
+            selectedCafe={selectedCafe}
+            onCafeSelect={setSelectedCafe}
+          />
+        </div>
+
+        {/* Pull-up Panel - reduced height to account for bottom nav */}
+        <div className="h-[45vh] flex-shrink-0">
+          <CafeListPanel
+            cafes={mockCafes}
+            selectedCafe={selectedCafe}
+            onCafeSelect={handleCafeSelect}
+            onFilterClick={() => setFilterSheetOpen(true)}
+            activeFilterCount={activeFilterCount}
+          />
+        </div>
+
+        {/* Bottom Navigation */}
+        <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+
+        {/* Filter Sheet */}
+        <FilterSheet
+          open={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          selectedFilters={selectedFilters}
+          onFilterChange={handleFilterChange}
+          onClearAll={handleClearFilters}
         />
+
+        {/* Toast notifications */}
+        <Toaster />
       </div>
+    );
+  };
 
-      {/* Filter Sheet */}
-      <FilterSheet
-        open={filterSheetOpen}
-        onOpenChange={setFilterSheetOpen}
-        selectedFilters={selectedFilters}
-        onFilterChange={handleFilterChange}
-        onClearAll={handleClearFilters}
-      />
-
-      {/* Toast notifications */}
-      <Toaster />
-    </div>
-  );
+  return renderMainContent();
 }

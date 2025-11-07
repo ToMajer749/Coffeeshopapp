@@ -187,3 +187,10 @@
 html {
   font-size: var(--font-size);
 }
+
+/* Safe area support for mobile devices with notches */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}

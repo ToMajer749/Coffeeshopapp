@@ -20,7 +20,7 @@ interface OrderEntry {
 
 interface OrderHistoryProps {
   orders: OrderEntry[];
-  onBack: () => void;
+  onBack?: () => void;
   onBeanClick: (beanId: string) => void;
   onCafeClick: (cafeId: string) => void;
 }
@@ -51,18 +51,20 @@ export function OrderHistory({
   });
 
   return (
-    <div className="flex flex-col h-screen bg-white max-w-md mx-auto">
+    <div className="flex flex-col h-full bg-white max-w-md mx-auto">
       {/* Header */}
       <div className="p-4 border-b bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            className="rounded-full"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          {onBack && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="rounded-full"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
           <div>
             <h2>Order History</h2>
             <p className="text-sm text-slate-600">
