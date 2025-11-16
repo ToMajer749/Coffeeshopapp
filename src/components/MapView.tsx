@@ -1,90 +1,167 @@
-import { MapPin } from "lucide-react";
+import { useMemo, useEffect, useRef, useState } from 'react'
+import { GoogleMap, useJsApiLoader } from '@react-google-maps/api'
+
+// libraries left empty to avoid requiring Advanced Marker library or Map ID
+const LIBRARIES: any[] = []
 
 interface CafeLocation {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
+  id: string
+  name: string
+  lat?: number
+  lng?: number
 }
 
 interface MapViewProps {
-  cafes: CafeLocation[];
-  selectedCafe?: string;
-  onCafeSelect: (id: string) => void;
+  cafes: CafeLocation[]
+  selectedCafe?: string
+  onCafeSelect: (id: string) => void
+}
+
+const containerStyle = {
+  width: '100%',
+  height: '100%', // ensure it fills the parent's flex-1 area
 }
 
 export function MapView({ cafes, selectedCafe, onCafeSelect }: MapViewProps) {
-  // Mock map - in production this would be Google Maps, Mapbox, etc.
+  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string
+
+  // load the "marker" library for AdvancedMarkerElement
+  const { isLoaded, loadError } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: mapsKey, libraries: LIBRARIES as any })
+  const mapRef = useRef<any | null>(null)
+  const markersRef = useRef<any[]>([])
+  const [map, setMap] = useState<any | null>(null)
+
+  // choose a fallback center from env or default to San Francisco
+  const FALLBACK_CENTER = useMemo(() => {
+    const lat = Number(import.meta.env.VITE_MAP_FALLBACK_LAT ?? NaN)
+    const lng = Number(import.meta.env.VITE_MAP_FALLBACK_LNG ?? NaN)
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng }
+    return { lat: 37.7749, lng: -122.4194 }
+  }, [])
+
+  const center = useMemo(() => {
+    // prefer the first cafe with valid coords
+    const first = cafes.find((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng))
+    if (first) return { lat: first.lat!, lng: first.lng! }
+    return FALLBACK_CENTER
+  }, [cafes, FALLBACK_CENTER])
+
+  useEffect(() => {
+    if (!map) return
+
+    // clear existing markers/overlays
+    markersRef.current.forEach((m) => {
+      try {
+        if (m && typeof (m as any).setMap === 'function') (m as any).setMap(null)
+      } catch (_) {}
+    })
+    markersRef.current = []
+
+    const google = (window as any).google
+    if (!google || !google.maps) return
+
+    // create markers as DOM overlays so no Map ID or AdvancedMarkerElement is required
+    cafes.forEach((c) => {
+      if (!Number.isFinite(c.lat) || !Number.isFinite(c.lng)) return
+      try {
+        const pinColor = '#f59e0b'
+        const pinHtml = document.createElement('div')
+        pinHtml.style.display = 'flex'
+        pinHtml.style.alignItems = 'center'
+        pinHtml.style.justifyContent = 'center'
+        pinHtml.style.width = '36px'
+        pinHtml.style.height = '36px'
+        pinHtml.style.transform = 'translateY(-6px)'
+        pinHtml.style.cursor = 'pointer'
+        pinHtml.innerHTML = `
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C8.13401 2 5 5.13401 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13401 15.866 2 12 2Z" fill="${pinColor}"/>
+            <circle cx="12" cy="9" r="2.8" fill="white"/>
+          </svg>
+        `
+
+        const Overlay = function(this: any) { this.div = null } as any
+        Overlay.prototype = new google.maps.OverlayView()
+
+        Overlay.prototype.onAdd = function(this: any) {
+          const div = document.createElement('div')
+          div.style.position = 'absolute'
+          div.style.transform = 'translate(-50%, -100%)'
+          div.style.cursor = 'pointer'
+          div.innerHTML = pinHtml.innerHTML
+          this.div = div
+          const panes = this.getPanes && this.getPanes()
+          if (panes && panes.overlayMouseTarget) panes.overlayMouseTarget.appendChild(div)
+          else if (panes && panes.overlayLayer) panes.overlayLayer.appendChild(div)
+          div.addEventListener('click', () => onCafeSelect(c.id))
+        }
+
+        Overlay.prototype.draw = function(this: any) {
+          if (!this.div) return
+          const projection = this.getProjection()
+          if (!projection) return
+          const pos = projection.fromLatLngToDivPixel(new google.maps.LatLng(c.lat, c.lng))
+          if (!pos) return
+          this.div.style.left = pos.x + 'px'
+          this.div.style.top = pos.y + 'px'
+        }
+
+        Overlay.prototype.onRemove = function(this: any) {
+          if (this.div && this.div.parentNode) this.div.parentNode.removeChild(this.div)
+          this.div = null
+        }
+
+        const overlay = new Overlay()
+        overlay.setMap(map)
+        markersRef.current.push(overlay)
+      } catch (err) {
+        // ignore marker creation errors
+      }
+    })
+  }, [map, cafes, onCafeSelect])
+
+  const hasAnyValidCoord = cafes.some((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng))
+
+  // Pan to selected cafe when it changes
+  useEffect(() => {
+    if (!map || !selectedCafe) return
+    const target = cafes.find((c) => c.id === selectedCafe)
+    if (target && Number.isFinite(target.lat) && Number.isFinite(target.lng)) {
+      try {
+        map.panTo({ lat: target.lat, lng: target.lng })
+        map.setZoom(15)
+      } catch (e) {}
+    }
+  }, [map, selectedCafe, cafes])
+
+  if (loadError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center p-6">
+        <div className="max-w-lg bg-white border border-rose-100 text-rose-800 p-4 rounded shadow">
+          <h3 className="font-semibold mb-2">Google Maps failed to load</h3>
+          <p className="text-sm mb-2">This usually means your API key or billing configuration isn't valid for this origin. Common causes:</p>
+          <ul className="list-disc pl-5 text-sm mb-2">
+            <li>Missing or invalid <code>VITE_GOOGLE_MAPS_API_KEY</code>.</li>
+            <li>Billed account not enabled for Maps JavaScript API or map requests blocked.</li>
+            <li>HTTP referrer restrictions on the API key block this origin (localhost or file://).</li>
+            <li>Missing or invalid Map ID when using Advanced Markers.</li>
+          </ul>
+          <p className="text-sm">Check your <a className="underline" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">Google Cloud credentials</a> and ensure the Maps JavaScript API is enabled. Set environment variables in <code>.env.local</code> and restart the dev server.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isLoaded) return <div className="w-full h-full bg-slate-100 flex items-center justify-center">Loading map…</div>
+
   return (
-    <div className="relative w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
-      {/* Map grid pattern */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="grid grid-cols-8 grid-rows-8 h-full w-full">
-          {Array.from({ length: 64 }).map((_, i) => (
-            <div key={i} className="border border-slate-300" />
-          ))}
-        </div>
-      </div>
-
-      {/* Street lines for map effect */}
-      <svg className="absolute inset-0 w-full h-full opacity-30">
-        <line x1="20%" y1="0" x2="20%" y2="100%" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="45%" y1="0" x2="45%" y2="100%" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="70%" y1="0" x2="70%" y2="100%" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="0" y1="25%" x2="100%" y2="25%" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="0" y1="55%" x2="100%" y2="55%" stroke="#94a3b8" strokeWidth="2" />
-        <line x1="0" y1="80%" x2="100%" y2="80%" stroke="#94a3b8" strokeWidth="2" />
-      </svg>
-
-      {/* Cafe markers */}
-      {cafes.map((cafe, index) => {
-        const left = 15 + (index * 18) % 70;
-        const top = 20 + (index * 23) % 60;
-        const isSelected = cafe.id === selectedCafe;
-
-        return (
-          <button
-            key={cafe.id}
-            onClick={() => onCafeSelect(cafe.id)}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-200 z-10"
-            style={{ left: `${left}%`, top: `${top}%` }}
-          >
-            <div
-              className={`relative ${
-                isSelected ? "scale-125" : "scale-100 hover:scale-110"
-              } transition-transform`}
-            >
-              <div
-                className={`rounded-full p-2 shadow-lg ${
-                  isSelected
-                    ? "bg-amber-600 ring-4 ring-amber-200"
-                    : "bg-white ring-2 ring-slate-300"
-                }`}
-              >
-                <MapPin
-                  className={`w-5 h-5 ${
-                    isSelected ? "text-white" : "text-amber-600"
-                  }`}
-                  fill={isSelected ? "white" : "#d97706"}
-                />
-              </div>
-              {isSelected && (
-                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow-md whitespace-nowrap text-xs">
-                  {cafe.name}
-                </div>
-              )}
-            </div>
-          </button>
-        );
-      })}
-
-      {/* User location indicator */}
-      <div className="absolute bottom-[45%] left-1/2 transform -translate-x-1/2">
-        <div className="relative">
-          <div className="w-4 h-4 bg-blue-500 rounded-full border-4 border-white shadow-lg" />
-          <div className="absolute inset-0 w-4 h-4 bg-blue-400 rounded-full animate-ping opacity-75" />
-        </div>
-      </div>
+    <div className="w-full h-full relative">
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={center}
+        zoom={13}
+        onLoad={(m) => { setMap(m); mapRef.current = m }}
+      />
     </div>
-  );
+  )
 }
