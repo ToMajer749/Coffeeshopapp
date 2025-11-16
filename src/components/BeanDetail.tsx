@@ -36,12 +36,12 @@ export function BeanDetail({
   name,
   origin,
   roaster,
-  flavorNotes,
+  flavorNotes = [],
   description,
   roastLevel,
   process,
   altitude,
-  cafesOffering,
+  cafesOffering = [],
   imageUrl,
   isFavorite,
   onBack,
@@ -119,7 +119,7 @@ export function BeanDetail({
           <div>
             <h3 className="mb-3">Flavor Profile</h3>
             <div className="flex flex-wrap gap-2 mb-4">
-              {flavorNotes.map((note, index) => (
+              {(flavorNotes ?? []).map((note, index) => (
                 <Badge
                   key={index}
                   className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1"
@@ -137,10 +137,10 @@ export function BeanDetail({
           <div>
             <h3 className="mb-3 flex items-center gap-2">
               <Coffee className="w-5 h-5 text-amber-600" />
-              Available At ({cafesOffering.length})
+              Available At ({(cafesOffering ?? []).length})
             </h3>
             <div className="space-y-3">
-              {cafesOffering.map((cafe) => (
+              {(cafesOffering ?? []).map((cafe) => (
                 <button
                   key={cafe.id}
                   onClick={() => onCafeClick(cafe.id)}

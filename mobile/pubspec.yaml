@@ -1,0 +1,33 @@
+name: coffee_mobile
+description: A Flutter mobile rewrite of CoffeeShopapp (mobile-first)
+publish_to: 'none'
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.5
+  flutter_riverpod: ^2.3.6
+  supabase_flutter: ^1.6.0
+  google_maps_flutter: ^2.4.0
+  mobile_scanner: ^2.0.0
+  cached_network_image: ^3.2.3
+  shared_preferences: ^2.1.1
+  connectivity_plus: ^4.0.1
+  drift: ^2.7.0
+  path_provider: ^2.0.15
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.5.4
+  freezed: ^2.2.0
+  freezed_annotation: ^2.2.0
+  json_serializable: ^6.6.0
+  drift_dev: ^2.7.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

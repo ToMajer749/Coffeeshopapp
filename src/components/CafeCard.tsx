@@ -16,7 +16,7 @@ interface CafeCardProps {
 export function CafeCard({
   name,
   distance,
-  beans,
+  beans = [],
   rating,
   reviews,
   isOpen,
@@ -59,7 +59,7 @@ export function CafeCard({
           </div>
 
           <div className="flex flex-wrap gap-1">
-            {beans.slice(0, 3).map((bean, index) => (
+            {(beans ?? []).slice(0, 3).map((bean, index) => (
               <Badge
                 key={index}
                 variant="secondary"
@@ -68,7 +68,7 @@ export function CafeCard({
                 {bean}
               </Badge>
             ))}
-            {beans.length > 3 && (
+            {(beans ?? []).length > 3 && (
               <Badge
                 variant="secondary"
                 className="text-xs px-2 py-0 bg-slate-100 text-slate-700 hover:bg-slate-100"
